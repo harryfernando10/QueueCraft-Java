@@ -1,11 +1,11 @@
 # Architecture
 
-QueueCraft keeps domain state and assignment rules in Java classes, with Swing as a view and input layer. The project has no database, server, network API, or runtime dependency beyond the JDK.
+Queuevanta keeps domain state and assignment rules in Java classes, with Swing as a view and input layer. The project has no database, server, network API, or runtime dependency beyond the JDK.
 
 ## Responsibilities
 
-- `app/QueueCraftApplication.main` starts the frame on Swing's Event Dispatch Thread (EDT).
-- `ui/QueueCraftFrame` builds the dashboard, gathers input, calls engine operations, and renders refreshed data. The frame never selects a counter itself.
+- `app/QueuevantaApplication.main` starts the frame on Swing's Event Dispatch Thread (EDT).
+- `ui/QueuevantaFrame` builds the dashboard, gathers input, calls engine operations, and renders refreshed data. The frame never selects a counter itself.
 - `engine/SimulationEngine` owns counters, customers, completed customers, the tick, statistics, and bounded event history. Its public state operations are synchronized.
 - `model/Customer` validates customer lifecycle transitions; `model/ServiceCounter` owns a FIFO waiting queue and one active customer.
 - `strategy/AssignmentStrategy` defines routing; `ShortestQueueStrategy` chooses the compatible enabled counter with the smallest active-plus-waiting load, then counter name.
@@ -23,7 +23,7 @@ QueueCraft keeps domain state and assignment rules in Java classes, with Swing a
 
 ```mermaid
 flowchart LR
-  UI[QueueCraftFrame on EDT] -->|actions| Engine[SimulationEngine]
+  UI[QueuevantaFrame on EDT] -->|actions| Engine[SimulationEngine]
   Engine --> Strategy[AssignmentStrategy]
   Strategy --> Shortest[ShortestQueueStrategy]
   Engine --> Model[Customer and ServiceCounter]
@@ -45,4 +45,4 @@ Disabling a counter prevents new assignments and prevents its waiting line from 
 
 ## Packages and tests
 
-`src/main/java/com/queuecraft` contains the packages above. `SimulationEngineTest` covers engine state, assignment, validation, and snapshots. `SimulationReportExporterTest` covers CSV output and invalid destinations. GUI behavior and scheduled-runner stress/lifecycle remain manual verification gaps; see [Testing](TESTING.md).
+`src/main/java/com/queuevanta` contains the packages above. `SimulationEngineTest` covers engine state, assignment, validation, and snapshots. `SimulationReportExporterTest` covers CSV output and invalid destinations. GUI behavior and scheduled-runner stress/lifecycle remain manual verification gaps; see [Testing](TESTING.md).

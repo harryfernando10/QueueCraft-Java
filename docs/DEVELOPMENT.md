@@ -10,7 +10,7 @@ Install JDK 17 or later and use the Maven Wrapper from the repository root in Po
 .\mvnw.cmd exec:java
 ```
 
-If Java is not discoverable, set `JAVA_HOME` to the JDK installation folder and ensure its `bin` folder is on `PATH`. The exec Maven goal starts `com.queuecraft.app.QueueCraftApplication`.
+If Java is not discoverable, set `JAVA_HOME` to the JDK installation folder and ensure its `bin` folder is on `PATH`. The exec Maven goal starts `com.queuevanta.app.QueuevantaApplication`.
 
 ## Debugging and design
 
