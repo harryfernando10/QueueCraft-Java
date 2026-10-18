@@ -2,23 +2,30 @@ package com.queuecraft.ui;
 
 import com.queuecraft.concurrent.SimulationRunner;
 import com.queuecraft.engine.SimulationEngine;
-import com.queuecraft.model.Customer;
+import com.queuecraft.model.CounterSnapshot;
 import com.queuecraft.model.ServiceCounter;
 import com.queuecraft.model.ServiceType;
 import com.queuecraft.service.CounterValidator;
+import com.queuecraft.service.SimulationReportExporter;
 import com.queuecraft.service.SimulationStats;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Locale;
 import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
@@ -30,40 +37,54 @@ import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 import javax.swing.border.EmptyBorder;
 
 /** Main dashboard for configuring and observing the QueueCraft simulation. */
 public final class QueueCraftFrame extends JFrame {
-  private static final Color BACKGROUND = new Color(244, 247, 251);
-  private static final Color INK = new Color(31, 48, 68);
-  private static final Color MUTED = new Color(91, 108, 128);
-  private static final Color ACCENT = new Color(33, 105, 158);
+  private static final Color BACKGROUND = new Color(13, 21, 34);
+  private static final Color SURFACE = new Color(24, 36, 54);
+  private static final Color SURFACE_LIGHT = new Color(31, 47, 68);
+  private static final Color TEXT = new Color(235, 242, 250);
+  private static final Color MUTED = new Color(160, 177, 197);
+  private static final Color TEAL = new Color(44, 190, 177);
+  private static final Color BLUE = new Color(83, 156, 238);
+  private static final Color GREEN = new Color(88, 195, 137);
+  private static final Color AMBER = new Color(240, 183, 82);
+  private static final Color RED = new Color(230, 113, 113);
 
   private final SimulationEngine engine = new SimulationEngine();
   private final SimulationRunner runner = new SimulationRunner(engine, this::refresh);
-  private final DefaultListModel<String> counterModel = new DefaultListModel<>();
-  private final JList<String> counterList = new JList<>(counterModel);
+  private final DefaultListModel<CounterSnapshot> counterModel = new DefaultListModel<>();
+  private final JList<CounterSnapshot> counterList = new JList<>(counterModel);
   private final JTextArea queues = new JTextArea();
   private final JTextArea log = new JTextArea();
-  private final JLabel summary = new JLabel();
-  private final JLabel stats = new JLabel();
+  private final JLabel simulationState = new JLabel();
+  private final JLabel generatedValue = new JLabel("0");
+  private final JLabel waitingValue = new JLabel("0");
+  private final JLabel servingValue = new JLabel("0");
+  private final JLabel completedValue = new JLabel("0");
+  private final JLabel averageWaitValue = new JLabel("0.0 ticks");
+  private final JLabel footerStatus = new JLabel("Ready");
   private final JComboBox<ServiceType> service = new JComboBox<>(ServiceType.values());
   private final JSpinner batch = new JSpinner(new SpinnerNumberModel(6, 1, 100, 1));
+  private final JSpinner waitThreshold = new JSpinner(new SpinnerNumberModel(12, 1, 1000, 1));
+  private final JButton availability = new JButton("Toggle availability");
 
   public QueueCraftFrame() {
-    super("QueueCraft — Campus Service Queue & Bottleneck Simulator");
+    super("QueueCraft | Campus Service Queue Simulator");
     setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-    setMinimumSize(new Dimension(900, 680));
-    setSize(1180, 820);
+    setMinimumSize(new Dimension(920, 680));
+    setSize(1200, 820);
     setLocationRelativeTo(null);
     build();
     seed();
     refresh();
     addWindowListener(
-        new WindowAdapter() {
+        new java.awt.event.WindowAdapter() {
           @Override
-          public void windowClosing(WindowEvent event) {
+          public void windowClosing(java.awt.event.WindowEvent event) {
             runner.close();
             dispose();
           }
@@ -71,143 +92,244 @@ public final class QueueCraftFrame extends JFrame {
   }
 
   private void build() {
-    JPanel root = new JPanel(new BorderLayout(14, 14));
-    root.setBorder(new EmptyBorder(20, 22, 20, 22));
+    JPanel root = new JPanel(new BorderLayout(16, 16));
+    root.setBorder(new EmptyBorder(22, 24, 18, 24));
     root.setBackground(BACKGROUND);
     setContentPane(root);
     root.add(buildHeader(), BorderLayout.NORTH);
 
-    JPanel body = new JPanel(new GridLayout(1, 2, 14, 0));
-    body.setOpaque(false);
-    body.add(buildCounters());
-    body.add(buildActivity());
-    root.add(body, BorderLayout.CENTER);
-    root.add(buildFooter(), BorderLayout.SOUTH);
+    JSplitPane dashboard =
+        new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, buildCounters(), buildInsights());
+    dashboard.setResizeWeight(0.44);
+    dashboard.setDividerLocation(480);
+    dashboard.setBorder(null);
+    dashboard.setOpaque(false);
+    root.add(dashboard, BorderLayout.CENTER);
+    root.add(buildControls(), BorderLayout.SOUTH);
   }
 
   private JPanel buildHeader() {
-    JPanel header = new JPanel(new GridLayout(2, 1, 2, 2));
+    JPanel header = new JPanel(new BorderLayout(12, 14));
     header.setOpaque(false);
-    JLabel title = new JLabel("QueueCraft");
-    title.setFont(new Font("Segoe UI", Font.BOLD, 28));
-    title.setForeground(INK);
+    JPanel titleBlock = new JPanel(new BorderLayout(4, 5));
+    titleBlock.setOpaque(false);
+    JLabel title = label("QueueCraft", 27, Font.BOLD, TEXT);
     JLabel subtitle =
-        new JLabel(
-            "Explore how service rates, queues, and parallel counters interact. One tick = 0.4"
-                + " seconds.");
-    subtitle.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-    subtitle.setForeground(MUTED);
-    header.add(title);
-    header.add(subtitle);
+        label("Explore how service rates and counter capacity shape simulated queues.", 13, Font.PLAIN, MUTED);
+    titleBlock.add(title, BorderLayout.NORTH);
+    titleBlock.add(subtitle, BorderLayout.CENTER);
+    simulationState.setFont(new Font("Segoe UI", Font.BOLD, 12));
+    simulationState.setForeground(TEAL);
+    simulationState.setHorizontalAlignment(SwingConstants.RIGHT);
+    header.add(titleBlock, BorderLayout.CENTER);
+    header.add(simulationState, BorderLayout.EAST);
+
+    JPanel kpis = new JPanel(new GridLayout(1, 5, 10, 0));
+    kpis.setOpaque(false);
+    kpis.add(kpi("GENERATED", generatedValue, BLUE));
+    kpis.add(kpi("WAITING", waitingValue, AMBER));
+    kpis.add(kpi("SERVING", servingValue, TEAL));
+    kpis.add(kpi("COMPLETED", completedValue, GREEN));
+    kpis.add(kpi("AVERAGE WAIT", averageWaitValue, new Color(178, 145, 235)));
+    header.add(kpis, BorderLayout.SOUTH);
     return header;
   }
 
-  private JPanel buildCounters() {
-    JPanel panel = card("Service counters");
-    panel.setLayout(new BorderLayout(10, 10));
-    counterList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-    counterList.setFixedCellHeight(56);
-    counterList.setToolTipText("Select a counter to enable, disable, or remove it.");
-    panel.add(new JScrollPane(counterList), BorderLayout.CENTER);
-
-    JPanel controls = new JPanel(new GridLayout(0, 1, 7, 7));
-    controls.setOpaque(false);
-    JButton add = new JButton("Add counter…");
-    JButton toggle = new JButton("Enable / disable selected");
-    JButton remove = new JButton("Remove selected");
-    add.setToolTipText("Create a counter with a service type and duration.");
-    toggle.setToolTipText("Disabled counters do not receive new customers.");
-    remove.setToolTipText("Only an idle counter can be removed.");
-    controls.add(add);
-    controls.add(toggle);
-    controls.add(remove);
-    panel.add(controls, BorderLayout.SOUTH);
-
-    add.addActionListener(event -> addCounter());
-    toggle.addActionListener(event -> toggleSelectedCounter());
-    remove.addActionListener(event -> removeSelectedCounter());
+  private JPanel kpi(String title, JLabel value, Color accent) {
+    JPanel panel = surfacePanel();
+    panel.setLayout(new BorderLayout(2, 6));
+    panel.setBorder(new EmptyBorder(12, 14, 12, 14));
+    JLabel caption = label(title, 10, Font.BOLD, MUTED);
+    value.setFont(new Font("Segoe UI", Font.BOLD, 21));
+    value.setForeground(accent);
+    panel.add(caption, BorderLayout.NORTH);
+    panel.add(value, BorderLayout.CENTER);
     return panel;
   }
 
-  private JPanel buildActivity() {
-    JPanel panel = card("Queues and event history");
+  private JPanel buildCounters() {
+    JPanel panel = card("Service counters", "Select a counter to manage availability or remove it.");
+    panel.setLayout(new BorderLayout(8, 10));
+    counterList.setBackground(SURFACE);
+    counterList.setSelectionBackground(SURFACE_LIGHT);
+    counterList.setSelectionForeground(TEXT);
+    counterList.setFixedCellHeight(104);
+    counterList.setCellRenderer(new CounterRenderer());
+    counterList.setToolTipText("Each card shows service, capacity, current work, and estimated wait.");
+    JScrollPane scroll = new JScrollPane(counterList);
+    styleScroll(scroll);
+    panel.add(scroll, BorderLayout.CENTER);
+
+    JPanel actions = new JPanel(new GridLayout(1, 3, 8, 0));
+    actions.setOpaque(false);
+    JButton add = secondaryButton("Add counter");
+    availability.setToolTipText("Disabling preserves active and waiting customers; re-enable the counter to resume its queue.");
+    availability.setForeground(TEAL);
+    JButton remove = secondaryButton("Remove idle counter");
+    add.setToolTipText("Add a counter with a unique name and service duration from 1 to 100 ticks.");
+    remove.setToolTipText("Remove a counter only when it has no active or waiting customers.");
+    actions.add(add);
+    actions.add(availability);
+    actions.add(remove);
+    panel.add(actions, BorderLayout.SOUTH);
+    add.addActionListener(event -> addCounter());
+    availability.addActionListener(event -> toggleSelectedCounter());
+    remove.addActionListener(event -> removeSelectedCounter());
+    counterList.addListSelectionListener(event -> updateAvailabilityButton());
+    return panel;
+  }
+
+  private JPanel buildInsights() {
+    JPanel panel = card("Queue view and activity", "Customer queues are FIFO; service counters advance in parallel.");
     panel.setLayout(new BorderLayout(8, 8));
     configureTextArea(queues);
     configureTextArea(log);
-    queues.setToolTipText("Current service and waiting customers, grouped by counter.");
-    log.setToolTipText("Recent simulation events, newest at the end.");
+    queues.setToolTipText("Active and waiting customers grouped by service counter.");
+    log.setToolTipText("Recent simulation events in tick order.");
     JScrollPane queuePane = new JScrollPane(queues);
-    queuePane.setBorder(BorderFactory.createTitledBorder("Customers by counter"));
     JScrollPane logPane = new JScrollPane(log);
-    logPane.setBorder(BorderFactory.createTitledBorder("Recent events"));
-    JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, queuePane, logPane);
-    split.setResizeWeight(0.58);
+    styleScroll(queuePane);
+    styleScroll(logPane);
+    JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, titledPane("CUSTOMERS BY COUNTER", queuePane), titledPane("RECENT EVENTS", logPane));
+    split.setResizeWeight(0.59);
     split.setBorder(null);
+    split.setOpaque(false);
     panel.add(split, BorderLayout.CENTER);
     return panel;
   }
 
-  private JPanel buildFooter() {
-    JPanel footer = new JPanel(new BorderLayout(8, 10));
-    footer.setOpaque(false);
-    JPanel metrics = new JPanel(new GridLayout(2, 1, 3, 3));
-    metrics.setOpaque(false);
-    summary.setFont(new Font("Segoe UI", Font.BOLD, 14));
-    summary.setForeground(INK);
-    stats.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-    stats.setForeground(MUTED);
-    metrics.add(summary);
-    metrics.add(stats);
-    footer.add(metrics, BorderLayout.NORTH);
-
+  private JPanel buildControls() {
+    JPanel footer = surfacePanel();
+    footer.setLayout(new BorderLayout(8, 8));
+    footer.setBorder(new EmptyBorder(12, 14, 12, 14));
+    JPanel controlRows = new JPanel(new GridLayout(2, 1, 0, 6));
+    controlRows.setOpaque(false);
     JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+    JPanel options = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
     actions.setOpaque(false);
-    JButton run = new JButton("Start / resume");
-    JButton pause = new JButton("Pause");
-    JButton reset = new JButton("Reset");
-    JButton generate = new JButton("Generate batch");
-    run.setBackground(ACCENT);
-    run.setForeground(Color.WHITE);
-    run.setToolTipText("Advance the simulation every 0.4 seconds.");
-    pause.setToolTipText("Stop advancing the simulation; existing queues are kept.");
-    reset.setToolTipText("Clear customers and statistics while preserving counters.");
-    service.setToolTipText("Choose the service requested by the new batch.");
-    batch.setToolTipText("Choose a batch size from 1 to 100 customers.");
-    actions.add(run);
-    actions.add(pause);
-    actions.add(reset);
-    actions.add(service);
-    actions.add(batch);
-    actions.add(generate);
-    footer.add(actions, BorderLayout.SOUTH);
+    options.setOpaque(false);
 
-    run.addActionListener(event -> runner.resume());
+    JButton start = primaryButton("Start / resume");
+    JButton pause = secondaryButton("Pause");
+    JButton generateOne = secondaryButton("Generate 1 customer");
+    JButton generateBatch = secondaryButton("Generate batch");
+    JButton reset = destructiveButton("Reset simulation");
+    JButton export = secondaryButton("Export CSV");
+    start.setToolTipText("Advance the simulation by one tick every 0.4 seconds.");
+    pause.setToolTipText("Stop tick progression and keep current queues and customers.");
+    generateOne.setToolTipText("Add one customer for the selected service.");
+    generateBatch.setToolTipText("Add the selected number of customers (1–100) for this service.");
+    reset.setToolTipText("Clear all customers, event history, and metrics while keeping configured counters.");
+    export.setToolTipText("Save the current simulation and per-counter summary as a UTF-8 CSV file.");
+    service.setToolTipText("Service requested by the next generated customer or batch.");
+    batch.setToolTipText("Number of customers to generate in one batch (1–100).");
+    waitThreshold.setToolTipText("Show a bottleneck warning at or above this estimated wait (ticks).");
+
+    JLabel thresholdLabel = new JLabel("Warn at estimated wait ≥");
+    thresholdLabel.setForeground(MUTED);
+    actions.add(start);
+    actions.add(pause);
+    actions.add(service);
+    actions.add(generateOne);
+    actions.add(batch);
+    actions.add(generateBatch);
+    options.add(thresholdLabel);
+    options.add(waitThreshold);
+    options.add(reset);
+    options.add(export);
+    controlRows.add(actions);
+    controlRows.add(options);
+    footerStatus.setForeground(MUTED);
+    footerStatus.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+    footer.add(controlRows, BorderLayout.CENTER);
+    footer.add(footerStatus, BorderLayout.SOUTH);
+
+    start.addActionListener(event -> runner.resume());
     pause.addActionListener(
         event -> {
           runner.pause();
           refresh();
         });
-    reset.addActionListener(event -> runner.reset());
-    generate.addActionListener(event -> generateBatch());
+    generateOne.addActionListener(event -> generateCustomers(1));
+    generateBatch.addActionListener(event -> generateCustomers((Integer) batch.getValue()));
+    reset.addActionListener(event -> confirmReset());
+    export.addActionListener(event -> exportCsv());
+    service.setForeground(TEXT);
+    waitThreshold.addChangeListener(event -> refreshCounters());
     return footer;
   }
 
-  private JPanel card(String title) {
-    JPanel panel = new JPanel();
-    panel.setBorder(
-        BorderFactory.createCompoundBorder(
-            BorderFactory.createTitledBorder(title), new EmptyBorder(8, 8, 8, 8)));
-    panel.setBackground(Color.WHITE);
+  private JPanel card(String title, String subtitle) {
+    JPanel panel = surfacePanel();
+    panel.setBorder(new EmptyBorder(14, 14, 14, 14));
+    JPanel heading = new JPanel(new BorderLayout(3, 4));
+    heading.setOpaque(false);
+    heading.add(label(title, 16, Font.BOLD, TEXT), BorderLayout.NORTH);
+    heading.add(label(subtitle, 11, Font.PLAIN, MUTED), BorderLayout.CENTER);
+    panel.add(heading, BorderLayout.NORTH);
     return panel;
+  }
+
+  private JPanel surfacePanel() {
+    JPanel panel = new JPanel();
+    panel.setBackground(SURFACE);
+    panel.setOpaque(true);
+    return panel;
+  }
+
+  private JPanel titledPane(String title, Component content) {
+    JPanel panel = new JPanel(new BorderLayout(0, 6));
+    panel.setOpaque(false);
+    panel.add(label(title, 10, Font.BOLD, MUTED), BorderLayout.NORTH);
+    panel.add(content, BorderLayout.CENTER);
+    return panel;
+  }
+
+  private JLabel label(String text, int size, int style, Color color) {
+    JLabel label = new JLabel(text);
+    label.setFont(new Font("Segoe UI", style, size));
+    label.setForeground(color);
+    return label;
+  }
+
+  private JButton primaryButton(String text) {
+    JButton button = new JButton(text);
+    button.setBackground(TEAL);
+    button.setForeground(BACKGROUND);
+    button.setFont(new Font("Segoe UI", Font.BOLD, 12));
+    button.setFocusPainted(false);
+    return button;
+  }
+
+  private JButton secondaryButton(String text) {
+    JButton button = new JButton(text);
+    button.setBackground(SURFACE_LIGHT);
+    button.setForeground(TEXT);
+    button.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+    button.setFocusPainted(false);
+    return button;
+  }
+
+  private JButton destructiveButton(String text) {
+    JButton button = secondaryButton(text);
+    button.setForeground(RED);
+    return button;
+  }
+
+  private void styleScroll(JScrollPane scroll) {
+    scroll.setBorder(BorderFactory.createLineBorder(new Color(47, 63, 83)));
+    scroll.getViewport().setBackground(SURFACE);
   }
 
   private void configureTextArea(JTextArea area) {
     area.setEditable(false);
     area.setFont(new Font("Consolas", Font.PLAIN, 12));
+    area.setForeground(TEXT);
+    area.setBackground(new Color(18, 29, 44));
+    area.setCaretColor(TEXT);
     area.setLineWrap(true);
     area.setWrapStyleWord(true);
-    area.setBackground(new Color(250, 252, 254));
-    area.setBorder(new EmptyBorder(8, 8, 8, 8));
+    area.setBorder(new EmptyBorder(10, 10, 10, 10));
   }
 
   private void seed() {
@@ -228,30 +350,24 @@ public final class QueueCraftFrame extends JFrame {
     JTextField name = new JTextField();
     JComboBox<ServiceType> type = new JComboBox<>(ServiceType.values());
     JSpinner ticks = new JSpinner(new SpinnerNumberModel(4, 1, 100, 1));
+    name.setToolTipText("Use a unique 2–30 character name starting with a letter.");
+    type.setToolTipText("The service type this counter can handle.");
+    ticks.setToolTipText("How many simulated ticks one customer needs (1–100).");
     JPanel form = new JPanel(new GridLayout(0, 2, 8, 8));
-    form.add(new JLabel("Name"));
+    form.add(new JLabel("Counter name"));
     form.add(name);
-    form.add(new JLabel("Service"));
+    form.add(new JLabel("Service type"));
     form.add(type);
-    form.add(new JLabel("Duration (ticks)"));
+    form.add(new JLabel("Service duration (ticks)"));
     form.add(ticks);
     int choice =
         JOptionPane.showConfirmDialog(
-            this,
-            form,
-            "Add service counter",
-            JOptionPane.OK_CANCEL_OPTION,
-            JOptionPane.PLAIN_MESSAGE);
-    if (choice != JOptionPane.OK_OPTION) {
-      return;
-    }
+            this, form, "Add service counter", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+    if (choice != JOptionPane.OK_OPTION) return;
     try {
       ServiceCounter counter =
           CounterValidator.create(
-              name.getText(),
-              (ServiceType) type.getSelectedItem(),
-              (Integer) ticks.getValue(),
-              engine.getCounters());
+              name.getText(), (ServiceType) type.getSelectedItem(), (Integer) ticks.getValue(), engine.getCounters());
       engine.addCounter(counter);
       refresh();
     } catch (Exception exception) {
@@ -260,14 +376,13 @@ public final class QueueCraftFrame extends JFrame {
   }
 
   private void toggleSelectedCounter() {
-    String name = selectedName();
-    if (name == null) {
+    CounterSnapshot selected = counterList.getSelectedValue();
+    if (selected == null) {
       showSelectionMessage();
       return;
     }
     try {
-      ServiceCounter counter = findCounter(name);
-      engine.setCounterEnabled(name, !counter.isEnabled());
+      engine.setCounterEnabled(selected.name(), !selected.enabled());
       refresh();
     } catch (Exception exception) {
       showError(exception);
@@ -275,142 +390,180 @@ public final class QueueCraftFrame extends JFrame {
   }
 
   private void removeSelectedCounter() {
-    String name = selectedName();
-    if (name == null) {
+    CounterSnapshot selected = counterList.getSelectedValue();
+    if (selected == null) {
       showSelectionMessage();
       return;
     }
+    int choice =
+        JOptionPane.showConfirmDialog(
+            this,
+            "Remove " + selected.name() + "? Only an idle counter can be removed.",
+            "Remove counter",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.WARNING_MESSAGE);
+    if (choice != JOptionPane.OK_OPTION) return;
     try {
-      engine.removeCounter(name);
+      engine.removeCounter(selected.name());
       refresh();
     } catch (Exception exception) {
       showError(exception);
     }
   }
 
-  private void generateBatch() {
+  private void generateCustomers(int count) {
     try {
-      engine.generateBatch((ServiceType) service.getSelectedItem(), (Integer) batch.getValue());
+      engine.generateBatch((ServiceType) service.getSelectedItem(), count);
+      footerStatus.setText(count == 1 ? "Generated 1 customer." : "Generated " + count + " customers.");
       refresh();
     } catch (Exception exception) {
       showError(exception);
     }
   }
 
-  private ServiceCounter findCounter(String name) {
-    return engine.getCounters().stream()
-        .filter(counter -> counter.getName().equals(name))
-        .findFirst()
-        .orElseThrow(() -> new IllegalStateException("Selected counter no longer exists."));
+  private void confirmReset() {
+    int choice =
+        JOptionPane.showConfirmDialog(
+            this,
+            "Reset clears all customers, event history, and metrics, then pauses. Counters are kept. Continue?",
+            "Reset simulation",
+            JOptionPane.OK_CANCEL_OPTION,
+            JOptionPane.WARNING_MESSAGE);
+    if (choice == JOptionPane.OK_OPTION) {
+      runner.reset();
+      footerStatus.setText("Simulation reset and paused; configured counters were kept.");
+    }
   }
 
-  private String selectedName() {
-    String selected = counterList.getSelectedValue();
-    return selected == null ? null : selected.substring(0, selected.indexOf("  |"));
+  private void exportCsv() {
+    JFileChooser chooser = new JFileChooser();
+    chooser.setDialogTitle("Export simulation summary");
+    chooser.setSelectedFile(new java.io.File("queuecraft-summary.csv"));
+    if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+    Path destination = chooser.getSelectedFile().toPath();
+    if (Files.isDirectory(destination)) {
+      showError(new IOException("Choose a file name, not a folder, for the CSV summary."));
+      return;
+    }
+    if (!destination.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".csv")) {
+      destination = destination.resolveSibling(destination.getFileName() + ".csv");
+    }
+    if (Files.exists(destination)) {
+      int choice =
+          JOptionPane.showConfirmDialog(
+              this,
+              "Replace the existing file " + destination.getFileName() + "?",
+              "Confirm CSV overwrite",
+              JOptionPane.OK_CANCEL_OPTION,
+              JOptionPane.WARNING_MESSAGE);
+      if (choice != JOptionPane.OK_OPTION) return;
+    }
+    try {
+      SimulationReportExporter.export(destination, engine.stats(), engine.getCounterSnapshots());
+      footerStatus.setText("CSV summary saved: " + destination.getFileName());
+    } catch (IOException exception) {
+      showError(exception);
+    }
+  }
+
+  private void updateAvailabilityButton() {
+    CounterSnapshot selected = counterList.getSelectedValue();
+    availability.setText(selected == null ? "Toggle availability" : selected.enabled() ? "Disable selected" : "Enable selected");
   }
 
   private void showSelectionMessage() {
-    JOptionPane.showMessageDialog(
-        this, "Select a counter first.", "QueueCraft", JOptionPane.INFORMATION_MESSAGE);
+    JOptionPane.showMessageDialog(this, "Select a counter first.", "QueueCraft", JOptionPane.INFORMATION_MESSAGE);
   }
 
   private void refresh() {
-    SimulationStats snapshot = engine.stats();
-    summary.setText(
-        "Tick "
-            + engine.getTick()
-            + "  ·  "
-            + (engine.isPaused() ? "Paused" : "Running")
-            + "  ·  "
-            + snapshot.generated()
-            + " customers generated");
-    stats.setText(
-        String.format(
-            "Waiting %d     Serving %d     Completed %d     Avg wait %.1f ticks"
-                + "     Avg service %.1f ticks     Max queue %d",
-            snapshot.waiting(),
-            snapshot.serving(),
-            snapshot.completed(),
-            snapshot.averageWait(),
-            snapshot.averageService(),
-            snapshot.maxQueue()));
-
-    counterModel.clear();
-    for (ServiceCounter counter : engine.getCounters()) {
-      String active =
-          counter.getCurrentCustomer() == null
-              ? "Idle"
-              : counter.getCurrentCustomer().getDisplayName()
-                  + " ("
-                  + counter.getRemainingTicks()
-                  + " ticks left)";
-      counterModel.addElement(
-          counter.getName()
-              + "  |  "
-              + (counter.isEnabled() ? "Enabled" : "Disabled")
-              + "  ·  "
-              + counter.getServiceType()
-              + "  ·  "
-              + counter.getServiceTicks()
-              + " ticks  ·  "
-              + active
-              + "  ·  waiting "
-              + counter.getWaitingCount());
-    }
-    renderQueues();
-    renderEvents();
+    SimulationStats stats = engine.stats();
+    simulationState.setText("●  " + (engine.isPaused() ? "PAUSED" : "RUNNING") + "    TICK " + engine.getTick());
+    generatedValue.setText(Integer.toString(stats.generated()));
+    waitingValue.setText(Integer.toString(stats.waiting()));
+    servingValue.setText(Integer.toString(stats.serving()));
+    completedValue.setText(Integer.toString(stats.completed()));
+    averageWaitValue.setText(String.format("%.1f ticks", stats.averageWait()));
+    refreshCounters();
+    renderQueues(engine.getCounterSnapshots());
+    renderEvents(engine.getEvents());
   }
 
-  private void renderQueues() {
+  private void refreshCounters() {
+    List<CounterSnapshot> snapshots = engine.getCounterSnapshots();
+    CounterSnapshot previous = counterList.getSelectedValue();
+    String selectedName = previous == null ? null : previous.name();
+    counterModel.clear();
+    for (CounterSnapshot snapshot : snapshots) counterModel.addElement(snapshot);
+    if (selectedName != null) {
+      for (int index = 0; index < counterModel.size(); index++) {
+        if (counterModel.get(index).name().equals(selectedName)) counterList.setSelectedIndex(index);
+      }
+    }
+    if (snapshots.isEmpty()) {
+      footerStatus.setText("No counters configured. Add a counter to begin a scenario.");
+    }
+    updateAvailabilityButton();
+    counterList.repaint();
+  }
+
+  private void renderQueues(List<CounterSnapshot> snapshots) {
     StringBuilder text = new StringBuilder();
-    for (ServiceCounter counter : engine.getCounters()) {
-      text.append(counter.getName())
-          .append(" — ")
-          .append(counter.isEnabled() ? "Enabled" : "Disabled")
-          .append('\n');
-      Customer active = counter.getCurrentCustomer();
+    for (CounterSnapshot counter : snapshots) {
+      text.append(counter.name()).append("  ·  ").append(counter.enabled() ? "Enabled" : "Disabled").append('\n');
       text.append("  Serving: ");
-      if (active == null) {
-        text.append("nobody");
-      } else {
-        text.append(active.getDisplayName())
-            .append(" ( ")
-            .append(counter.getRemainingTicks())
-            .append(" ticks remaining )");
-      }
+      if (counter.activeCustomer() == null) text.append("nobody");
+      else text.append(counter.activeCustomer()).append(" (").append(counter.remainingTicks()).append(" ticks left)");
       text.append("\n  Waiting: ");
-      if (counter.getWaitingCount() == 0) {
-        text.append("nobody");
-      } else {
-        boolean first = true;
-        for (Customer customer : counter.getWaiting()) {
-          if (!first) {
-            text.append(", ");
-          }
-          text.append(customer.getDisplayName());
-          first = false;
-        }
-      }
+      text.append(counter.waitingCustomers().isEmpty() ? "nobody" : String.join(", ", counter.waitingCustomers()));
       text.append("\n\n");
     }
-    queues.setText(text.length() == 0 ? "No service counters configured." : text.toString());
+    queues.setText(text.length() == 0 ? "No service counters configured.\nAdd a counter to start exploring a queue scenario." : text.toString());
     queues.setCaretPosition(0);
   }
 
-  private void renderEvents() {
+  private void renderEvents(List<String> events) {
     StringBuilder text = new StringBuilder();
-    for (String event : engine.getEvents()) {
-      text.append(event).append('\n');
-    }
-    log.setText(text.length() == 0 ? "No events yet." : text.toString());
+    for (String event : events) text.append(event).append('\n');
+    log.setText(text.length() == 0 ? "No events yet. Start the simulation or generate customers to see activity." : text.toString());
     log.setCaretPosition(log.getDocument().getLength());
   }
 
   private void showError(Exception exception) {
     String message =
-        exception.getMessage() == null
-            ? "The requested action could not be completed."
-            : exception.getMessage();
+        exception.getMessage() == null ? "The requested action could not be completed." : exception.getMessage();
     JOptionPane.showMessageDialog(this, message, "QueueCraft", JOptionPane.WARNING_MESSAGE);
+  }
+
+  private final class CounterRenderer extends DefaultListCellRenderer {
+    @Override
+    public Component getListCellRendererComponent(
+        JList<?> list, Object value, int index, boolean selected, boolean focused) {
+      CounterSnapshot counter = (CounterSnapshot) value;
+      JPanel card = new JPanel(new BorderLayout(8, 5));
+      card.setBorder(new EmptyBorder(10, 12, 10, 12));
+      card.setBackground(selected ? SURFACE_LIGHT : SURFACE);
+      JPanel top = new JPanel(new BorderLayout());
+      top.setOpaque(false);
+      JLabel name = label(counter.name(), 14, Font.BOLD, TEXT);
+      JLabel status = label(counter.enabled() ? "ENABLED" : "DISABLED", 10, Font.BOLD, counter.enabled() ? GREEN : MUTED);
+      top.add(name, BorderLayout.WEST);
+      top.add(status, BorderLayout.EAST);
+      JLabel serviceLabel = label(counter.serviceType().getLabel() + "  ·  " + counter.serviceTicks() + " ticks per customer", 11, Font.PLAIN, MUTED);
+      String active = counter.activeCustomer() == null ? "Idle" : counter.activeCustomer() + " · " + counter.remainingTicks() + " ticks left";
+      JLabel workload = label("Serving: " + active + "     Waiting: " + counter.waitingCustomers().size() + "     Completed: " + counter.completed(), 11, Font.PLAIN, TEXT);
+      boolean warning = counter.estimatedWaitTicks() >= (Integer) waitThreshold.getValue() && counter.load() > 0;
+      JLabel estimate = label(
+          warning ? "BOTTLENECK  ·  estimated wait " + counter.estimatedWaitTicks() + " ticks (threshold " + waitThreshold.getValue() + ")"
+              : "Estimated wait " + counter.estimatedWaitTicks() + " ticks",
+          10, Font.BOLD, warning ? AMBER : TEAL);
+      JPanel details = new JPanel(new GridLayout(3, 1, 2, 2));
+      details.setOpaque(false);
+      details.add(serviceLabel);
+      details.add(workload);
+      details.add(estimate);
+      card.add(top, BorderLayout.NORTH);
+      card.add(details, BorderLayout.CENTER);
+      return card;
+    }
   }
 }

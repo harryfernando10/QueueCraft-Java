@@ -1,9 +1,18 @@
 package com.queuecraft.engine;
 
-import com.queuecraft.model.*;
-import com.queuecraft.service.*;
-import com.queuecraft.strategy.*;
-import java.util.*;
+import com.queuecraft.model.CounterSnapshot;
+import com.queuecraft.model.Customer;
+import com.queuecraft.model.CustomerStatus;
+import com.queuecraft.model.ServiceCounter;
+import com.queuecraft.model.ServiceType;
+import com.queuecraft.service.SimulationException;
+import com.queuecraft.service.SimulationStats;
+import com.queuecraft.strategy.AssignmentStrategy;
+import com.queuecraft.strategy.ShortestQueueStrategy;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 public final class SimulationEngine {
   private final Map<String, ServiceCounter> counters = new LinkedHashMap<>();
@@ -121,6 +130,25 @@ public final class SimulationEngine {
 
   public synchronized List<ServiceCounter> getCounters() {
     return List.copyOf(counters.values());
+  }
+
+  /** Returns detached counter data safe to render after this method releases the engine lock. */
+  public synchronized List<CounterSnapshot> getCounterSnapshots() {
+    return counters.values().stream()
+        .map(
+            counter ->
+                new CounterSnapshot(
+                    counter.getName(),
+                    counter.getServiceType(),
+                    counter.getServiceTicks(),
+                    counter.isEnabled(),
+                    counter.getCurrentCustomer() == null
+                        ? null
+                        : counter.getCurrentCustomer().getDisplayName(),
+                    counter.getRemainingTicks(),
+                    counter.getWaiting().stream().map(Customer::getDisplayName).toList(),
+                    counter.getCompletedCount()))
+        .toList();
   }
 
   public synchronized List<Customer> getCustomers() {

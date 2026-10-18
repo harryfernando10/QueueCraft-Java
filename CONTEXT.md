@@ -1,20 +1,20 @@
 # QueueCraft Development Context
 
-QueueCraft is a Java 17+ Swing teaching simulator. This file is a concise handover; verify branch and remote state with Git because those change over time.
+QueueCraft is a Java 17+ Swing teaching simulator for configured campus service queues. It shows simulated behavior and does not predict actual campus waiting times.
 
-## Architecture
+## Current architecture
 
-- `QueueCraftApplication` opens the frame on Swing's Event Dispatch Thread.
-- `QueueCraftFrame` presents controls and renders counter snapshots, queues, metrics, and events.
-- `SimulationEngine` owns synchronized simulation state, assignment, ticks, and event history.
-- `Customer` and `ServiceCounter` model customer transitions and FIFO service queues.
-- `AssignmentStrategy` is implemented by `ShortestQueueStrategy`.
-- `SimulationRunner` schedules ticks on a single daemon executor and posts refresh callbacks to the EDT.
-- `CounterValidator` validates new counter configuration; `SimulationStats` is the metrics record.
+- `QueueCraftApplication` opens `QueueCraftFrame` on Swing's Event Dispatch Thread.
+- `QueueCraftFrame` displays KPIs, counter cards, queue/activity panels, controls, wait warnings, and CSV export.
+- `SimulationEngine` synchronizes state and delegates routing to `AssignmentStrategy`; the default is `ShortestQueueStrategy`.
+- `Customer` and `ServiceCounter` enforce lifecycle and FIFO service queue behavior.
+- `CounterSnapshot` captures detached counter display/analytics values under the engine lock.
+- `SimulationRunner` advances ticks on a single scheduled daemon worker and posts UI refreshes to the EDT.
+- `SimulationStats`, `CounterValidator`, and `SimulationReportExporter` provide metrics, configuration validation, and UTF-8 CSV output.
 
 ## Build and tests
 
-Use JDK 17+ and the included Maven Wrapper:
+Use JDK 17+ and the Maven Wrapper:
 
 ```powershell
 .\mvnw.cmd clean package
@@ -22,12 +22,14 @@ Use JDK 17+ and the included Maven Wrapper:
 .\mvnw.cmd exec:java
 ```
 
-## Design decisions and limits
+There are 9 JUnit tests across `SimulationEngineTest` and `SimulationReportExporterTest`.
 
-Data is held in memory. Each 400 ms scheduled tick advances all counters. Assignment considers enabled counters of the requested service and uses active-plus-waiting load, then name for ties. Completed customers supply average wait and service values. There is no real-world arrival model, persistence, utilization accounting, GUI automation, or concurrency stress suite.
+## Important decisions and limits
 
-Keep the engine synchronized and Swing component updates on the EDT. Close the runner when closing the frame. Preserve the Maven Wrapper and package structure unless a concrete need justifies a change. Do not add syllabus constructs that have no project purpose.
+Routing is shortest active-plus-waiting load, ties alphabetical. Disabled counters keep assigned customers; the active customer can finish, and the waiting queue resumes after re-enable. Estimated wait is active remaining ticks plus one full service duration per waiting customer. The warning threshold is expressed in ticks. The simulation advances each 400 ms; this is not a real campus-time estimate. No utilization, persistence, automatic arrivals, alternate policies, scenario comparison, charts, or GUI automation exists.
 
-## Safe workflow
+## Git state and next steps
 
-Inspect `git status`, branch, and remote before editing. Base feature work on current `origin/main`; never commit directly to `main`. Run the test suite, package build, and `git diff --check` after changes. See [development](docs/DEVELOPMENT.md), [architecture](docs/ARCHITECTURE.md), [tests](docs/TESTING.md), [module mapping](docs/MODULE_MAPPING.md), and [roadmap](docs/ROADMAP.md).
+Feature work is based on `origin/main` in `feature/queuecraft-product-enhancements`. Verify live state with `git status --short --branch` and `git log -1 --oneline`; branch, commit, and remote status change as work progresses. Before finalizing, rerun tests and `clean package`, run `git diff --check`, inspect the full diff, commit intended changes, and push the branch. GitHub CLI is not installed in the current environment, so PR creation may require the repository web interface.
+
+See [architecture](docs/ARCHITECTURE.md), [testing](docs/TESTING.md), [development guide](docs/DEVELOPMENT.md), and [roadmap](docs/ROADMAP.md).

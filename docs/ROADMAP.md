@@ -1,19 +1,30 @@
 # Development Roadmap
 
-Progress reflects source currently present on `main` as inspected for this work. Planned work is not marked complete merely because it is listed here.
+Status reflects implementation on the current feature branch. Planned work below is not described as current functionality.
 
-## Phase 1 — Working simulator and core Java concepts
+## Completed in current implementation
 
-**Implemented:** Swing application, campus service counters, FIFO waiting queues, shortest-load assignment with deterministic name tie-breaking, synchronized simulation engine, scheduled runner, tick-based statistics, bounded event history, Maven wrapper, and unit tests. See [Module Mapping](MODULE_MAPPING.md).
+- Swing dashboard with simulation state and KPI cards, counter workload cards, queue and event views, tooltips, and confirmation for reset/removal.
+- Individual and batch customer generation.
+- Shortest active-plus-waiting-load routing across compatible enabled counters, with alphabetical tie-breaking.
+- Safe counter disable/re-enable behavior that preserves assigned customers.
+- Per-counter estimated-wait display and user-configurable warning threshold.
+- UTF-8 CSV export for simulation and counter summaries.
+- Immutable counter snapshots, engine tests, report-export tests, and project documentation.
 
-## Phase 2 — UI refinement, validation, and edge cases
+## Known gaps
 
-**In progress:** Improve dashboard hierarchy, readability, empty states, control help, and counter/customer presentation while preserving engine rules. Continue validating actions and error paths; consider focused tests for lifecycle behavior where deterministic seams are available.
+- No automatic arrival process, reproducible random scenarios, alternate routing strategy, scenario persistence, or scenario comparison.
+- No queue trend charts or scenario-based workload comparison.
+- No utilization measure: the engine does not collect busy/idle time for a defined observation window.
+- No Swing GUI automation, scheduled-runner lifecycle test, or concurrency stress test.
+- Build and tests do not confirm visual quality across operating systems or display scaling.
 
-## Phase 3 — Relevant syllabus concepts
+## Possible future work
 
-**Ongoing selectively:** Document concepts naturally demonstrated by the project. Add a syllabus concept only when it supports a real requirement and can be explained in the code. Do not add unused `Vector`, `StringBuffer`, inheritance trees, or artificial threading examples.
+1. Add deterministic engine seams and tests for scheduled-runner pause/resume/shutdown behavior.
+2. Consider alternate strategies behind `AssignmentStrategy` after adding comparative tests and a clear UI choice.
+3. Consider an optional seeded arrival model or saved scenario only if repeatability and comparison have a clear teaching benefit.
+4. Add actual queue history and charts only after defining collection intervals and metric units.
 
-## Phase 4 — Optional extensions
-
-Possible future work includes scenario presets, accessible counter tables, configurable tick interval, and utilization only after an explicit observation-window model is designed. Persistence, network services, forecasting, and real campus waiting-time estimates are outside current scope.
+No future item should claim actual campus forecasts or scientific prediction.

@@ -2,23 +2,29 @@
 
 ## Commands
 
-From the project root:
+From the project root in PowerShell:
 
 ```powershell
 .\mvnw.cmd test
 .\mvnw.cmd clean package
 ```
 
-JUnit 5 tests live in `src/test/java/com/queuecraft/SimulationEngineTest.java`.
+## Automated tests
 
-## Current automated coverage
+`src/test/java/com/queuecraft/SimulationEngineTest.java` verifies:
 
-- Customer waiting/service transitions, duration calculations, and invalid completion transition.
-- Shortest-load selection, compatible services, and deterministic name tie-breaking.
-- Customer completion, wait/service averages, queue totals, and empty statistics.
-- Paused tick behavior, resume, reset, and disabled/unavailable counters.
-- Duplicate counter names and counter-name validation.
+- Customer wait/service transitions, duration calculations, and invalid completion transition.
+- Compatible shortest-load assignment and deterministic name tie-breaking.
+- Completion counts, averages, empty metrics, and paused tick behavior.
+- Reset behavior and disabled-counter handling.
+- Duplicate-name and input validation.
+- A disabled counter retains its waiting line, can be re-enabled, and yields a detached immutable snapshot with the expected estimated wait.
 
-## Gaps
+`src/test/java/com/queuecraft/SimulationReportExporterTest.java` verifies:
 
-There are no Swing GUI automation tests, scheduled-runner lifecycle tests, concurrency stress tests, or direct resource-leak tests. Manually start/resume, pause, generate a batch, toggle an idle counter, reset, and close the window to review those paths. Do not treat a successful compile as visual verification.
+- CSV summary output, unit labels, and quoting for counter names containing commas.
+- An invalid destination (a directory) is rejected.
+
+## Current verification and gaps
+
+The current project test suite contains 9 JUnit tests. Build/test verification does not visually verify the Swing layout. There are no GUI automation tests, scheduled-runner lifecycle tests, concurrency stress tests, or direct executor leak tests. Manually start/resume, pause, generate a batch, add and disable a counter, re-enable it, export a CSV, reset, and close the window to review those paths.
