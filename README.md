@@ -56,7 +56,7 @@ The Maven Wrapper downloads Maven 3.9.11 without requiring a global Maven instal
 
 1. Start the app; sample counters and waiting guests appear immediately.
 2. Click Start / resume to advance simulation ticks.
-3. Watch active service, waiting queues, event log, and statistics update.
+3. Watch each counter’s active guest and waiting guest labels, plus the event log and statistics.
 4. Generate batches from the service dropdown; each tick takes 0.4 real seconds and is an arbitrary simulation unit.
 5. Enable/disable a selected counter to compare capacity, or add another counter to increase it.
 6. Click Pause or Reset as needed. Reset clears customers and counter totals while preserving configured counters.
@@ -69,7 +69,7 @@ Counter names must contain 2–30 permitted characters (letter first, then lette
 2. Start the simulation. Explain that independent counters advance on each shared tick, illustrating parallel service.
 3. Generate a batch of 6 canteen customers and observe customers queue across compatible counters.
 4. Let several complete; point out that average wait and service duration include completed customers only.
-5. Pause. Add a second IT Help Desk counter or enable a disabled counter, then generate customers of that type. Compare the queue clearing pace.
+5. While running, add a second IT Help Desk counter, generate an IT batch, and compare how quickly the two eligible counters clear their queues.
 6. Reset and show customer data, totals, and tick return to zero while configured counters remain.
 
 ## Metrics

@@ -8,7 +8,7 @@ The single-thread scheduled executor advances the engine every 400 ms. Engine me
 
 ## UI communication
 
-The frame submits user actions to engine methods and reads immutable list snapshots and statistics for rendering. Tick work stays outside the EDT; Swing components are updated only on the EDT.
+The frame submits user actions to engine methods and reads immutable list snapshots and statistics for rendering. The queue pane lists active and waiting customer labels per counter. Tick work stays outside the EDT; Swing components are updated only on the EDT.
 
 Packages: model (customer/counter/status/service), engine (simulation state and ticks), strategy (routing interface), service (validation/statistics/checked exception), concurrent (worker lifecycle), UI (Swing), app (entry point).
 

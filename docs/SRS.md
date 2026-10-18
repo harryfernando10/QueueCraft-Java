@@ -7,7 +7,7 @@ QueueCraft is an educational desktop simulator for comparing campus queue behavi
 A student or instructor demonstrating queues, service rates, and parallel counters.
 
 ## Functional requirements
-- FR-01 Show service counters, active customers, waiting counts, status, statistics, and events.
+- FR-01 Show service counters, active customers, waiting customer labels, status, statistics, and events.
 - FR-02 Add, remove idle, enable, and disable counters.
 - FR-03 Generate single customers or batches (1–100) for a service type.
 - FR-04 Route customers to the enabled compatible counter with least active-plus-waiting load; break ties by name.
