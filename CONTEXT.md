@@ -1,25 +1,33 @@
-# QueueCraft development context
+# QueueCraft Development Context
 
-## Purpose and current status
-QueueCraft is a Java 17 Swing educational campus queue simulator. Initial implementation is on feature/initial-implementation; a baseline project setup commit is on local main. Maven Wrapper is included. Public GitHub repository: https://github.com/harryfernando10/QueueCraft-Java. Pull request #1 is open from feature/initial-implementation to main. The feature branch is pushed and tracks origin/feature/initial-implementation; main tracks origin/main.
+QueueCraft is a Java 17+ Swing teaching simulator. This file is a concise handover; verify branch and remote state with Git because those change over time.
 
-## Architecture and key classes
-- QueueCraftApplication: Swing startup on the Event Dispatch Thread.
-- QueueCraftFrame: controls, sample scenario, counters, metrics and event presentation.
-- SimulationEngine: synchronized in-memory state and simulation ticks.
-- ServiceCounter, Customer, ServiceType, CustomerStatus: domain model.
-- AssignmentStrategy / ShortestQueueStrategy: interchangeable counter routing.
-- SimulationRunner: single scheduled daemon worker; posts refreshes to the EDT.
-- CounterValidator: counter-name regex and uniqueness validation.
+## Architecture
 
-## Features
-Sample counters/customers, counter management, batches, shortest-load assignment, pause/resume/reset, parallel counter ticks, statistics, and a 250-entry activity log are implemented.
+- `QueueCraftApplication` opens the frame on Swing's Event Dispatch Thread.
+- `QueueCraftFrame` presents controls and renders counter snapshots, queues, metrics, and events.
+- `SimulationEngine` owns synchronized simulation state, assignment, ticks, and event history.
+- `Customer` and `ServiceCounter` model customer transitions and FIFO service queues.
+- `AssignmentStrategy` is implemented by `ShortestQueueStrategy`.
+- `SimulationRunner` schedules ticks on a single daemon executor and posts refresh callbacks to the EDT.
+- `CounterValidator` validates new counter configuration; `SimulationStats` is the metrics record.
 
-## Commands
-.\mvnw.cmd clean package, .\mvnw.cmd test, .\mvnw.cmd exec:java.
+## Build and tests
 
-## Design decisions and limitations
-A simulation tick is scheduled every 400 ms; it is not a real-world minute. Collections are in memory. Completed customer wait/service durations use tick differences. Utilization is absent because there is no observation window or idle-time tracking. The GUI process launched and responded, but visual inspection was unavailable through the current computer-use inventory. GUI responsiveness and executor shutdown need manual verification. No persistence or external runtime dependency is intended.
+Use JDK 17+ and the included Maven Wrapper:
 
-## Future agent instructions
-Inspect current code before editing. Keep scope to Java Modules 1–7, avoid unrelated rewrites, preserve the synchronized engine/EDT boundary, run the tests, and update documentation. Do not claim a successful build or remote publication without verifying it.
+```powershell
+.\mvnw.cmd clean package
+.\mvnw.cmd test
+.\mvnw.cmd exec:java
+```
+
+## Design decisions and limits
+
+Data is held in memory. Each 400 ms scheduled tick advances all counters. Assignment considers enabled counters of the requested service and uses active-plus-waiting load, then name for ties. Completed customers supply average wait and service values. There is no real-world arrival model, persistence, utilization accounting, GUI automation, or concurrency stress suite.
+
+Keep the engine synchronized and Swing component updates on the EDT. Close the runner when closing the frame. Preserve the Maven Wrapper and package structure unless a concrete need justifies a change. Do not add syllabus constructs that have no project purpose.
+
+## Safe workflow
+
+Inspect `git status`, branch, and remote before editing. Base feature work on current `origin/main`; never commit directly to `main`. Run the test suite, package build, and `git diff --check` after changes. See [development](docs/DEVELOPMENT.md), [architecture](docs/ARCHITECTURE.md), [tests](docs/TESTING.md), [module mapping](docs/MODULE_MAPPING.md), and [roadmap](docs/ROADMAP.md).
