@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-QueueCraft is an educational desktop simulator for exploring campus service queues using explicit, user-configured assumptions. It illustrates queue behavior; it does not predict real campus waiting times.
+Queuevanta is an educational desktop simulator for exploring campus service queues using explicit, user-configured assumptions. It illustrates queue behavior; it does not predict real campus waiting times.
 
 ## Users
 

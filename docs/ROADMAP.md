@@ -5,12 +5,14 @@ Status reflects implementation on the current feature branch. Planned work below
 ## Completed in current implementation
 
 - Swing dashboard with simulation state and KPI cards, counter workload cards, queue and event views, tooltips, and confirmation for reset/removal.
+- Queuevanta visual identity with a cool light-gray background, white surfaces, blue/teal accents, larger functional typography, and clearer responsive layout.
 - Individual and batch customer generation.
 - Shortest active-plus-waiting-load routing across compatible enabled counters, with alphabetical tie-breaking.
 - Safe counter disable/re-enable behavior that preserves assigned customers.
 - Per-counter estimated-wait display and user-configurable warning threshold.
 - UTF-8 CSV export for simulation and counter summaries.
 - Immutable counter snapshots, engine tests, report-export tests, and project documentation.
+- Queuevanta package/class/Maven rename and user-facing project documentation.
 
 ## Known gaps
 
