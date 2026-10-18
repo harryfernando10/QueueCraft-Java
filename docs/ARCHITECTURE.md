@@ -11,4 +11,26 @@ The single-thread scheduled executor advances the engine every 400 ms. Engine me
 The frame submits user actions to engine methods and reads immutable list snapshots and statistics for rendering. Tick work stays outside the EDT; Swing components are updated only on the EDT.
 
 Packages: model (customer/counter/status/service), engine (simulation state and ticks), strategy (routing interface), service (validation/statistics/checked exception), concurrent (worker lifecycle), UI (Swing), app (entry point).
-\n## Class relationships\n\n```mermaid\nclassDiagram\n  class Customer\n  class ServiceCounter\n  class SimulationEngine\n  class AssignmentStrategy {\n    <<interface>>\n    +chooseCounter(customer, counters)\n  }\n  class ShortestQueueStrategy\n  class SimulationRunner\n  class QueueCraftFrame\n  SimulationEngine o-- ServiceCounter\n  SimulationEngine o-- Customer\n  SimulationEngine --> AssignmentStrategy\n  AssignmentStrategy <|.. ShortestQueueStrategy\n  QueueCraftFrame --> SimulationEngine\n  QueueCraftFrame --> SimulationRunner\n  SimulationRunner --> SimulationEngine\n```\n
+
+## Class relationships
+
+```mermaid
+classDiagram
+  class Customer
+  class ServiceCounter
+  class SimulationEngine
+  class AssignmentStrategy {
+    <<interface>>
+    +chooseCounter(customer, counters)
+  }
+  class ShortestQueueStrategy
+  class SimulationRunner
+  class QueueCraftFrame
+  SimulationEngine o-- ServiceCounter
+  SimulationEngine o-- Customer
+  SimulationEngine --> AssignmentStrategy
+  AssignmentStrategy <|.. ShortestQueueStrategy
+  QueueCraftFrame --> SimulationEngine
+  QueueCraftFrame --> SimulationRunner
+  SimulationRunner --> SimulationEngine
+```
