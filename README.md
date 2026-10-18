@@ -62,9 +62,6 @@ docs/           Architecture, requirements, development, testing, mapping, roadm
 
 Counter names must be 2–30 characters, start with a letter, and contain only letters, digits, spaces, underscores, or hyphens. Durations and batch sizes are 1–100.
 
-## Java Modules 1–7
-
-The project naturally demonstrates Java basics, OOP, interfaces/inheritance, collections, strings/regex, exceptions, and multithreading. Some syllabus features (such as `Vector`, `StringBuffer`, custom abstract classes, or a `finally` block) are not useful to this implementation and are intentionally absent. See [the verified module mapping](docs/MODULE_MAPPING.md).
 
 ## Documentation
 
