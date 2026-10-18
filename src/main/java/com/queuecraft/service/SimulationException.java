@@ -1,2 +1,7 @@
 package com.queuecraft.service;
-public class SimulationException extends Exception {public SimulationException(String message){super(message);}}
+
+public class SimulationException extends Exception {
+  public SimulationException(String message) {
+    super(message);
+  }
+}

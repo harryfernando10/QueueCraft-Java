@@ -1,2 +1,8 @@
 package com.queuecraft.model;
-public enum CustomerStatus { WAITING, BEING_SERVED, COMPLETED, CANCELLED }
+
+public enum CustomerStatus {
+  WAITING,
+  BEING_SERVED,
+  COMPLETED,
+  CANCELLED
+}
