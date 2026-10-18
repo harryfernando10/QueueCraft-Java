@@ -1,0 +1,3 @@
+package com.queuecraft.service;
+import com.queuecraft.model.*; import java.util.Collection;
+public final class CounterValidator { private CounterValidator(){} public static ServiceCounter create(String name,ServiceType type,int ticks,Collection<ServiceCounter> existing)throws SimulationException{if(name==null||!name.matches("[\\p{L}][\\p{L}0-9 _-]{1,29}"))throw new SimulationException("Use 2–30 characters, starting with a letter; letters, numbers, spaces, _ and - are allowed.");if(existing.stream().anyMatch(c->c.getName().equalsIgnoreCase(name.trim())))throw new SimulationException("A counter with that name already exists.");try{return new ServiceCounter(name,type,ticks);}catch(IllegalArgumentException e){throw new SimulationException(e.getMessage());}} }
