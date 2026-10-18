@@ -34,7 +34,6 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
@@ -59,9 +58,26 @@ public final class QueuevantaFrame extends JFrame {
     private final SimulationEngine engine = new SimulationEngine();
     private final SimulationRunner runner = new SimulationRunner(engine, this::refresh);
     private final DefaultListModel<CounterSnapshot> counterModel = new DefaultListModel<>();
-    private final JList<CounterSnapshot> counterList = new JList<>(counterModel);
-    private final JTextArea queues = new JTextArea();
-    private final JTextArea log = new JTextArea();
+    private final JList<CounterSnapshot> counterList = new JList<>(counterModel) {
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+    };
+    private final DefaultListModel<QueuePanelModel.Row> queueModel = new DefaultListModel<>();
+    private final JList<QueuePanelModel.Row> queues = new JList<>(queueModel) {
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+    };
+    private final DefaultListModel<String> eventModel = new DefaultListModel<>();
+    private final JList<String> log = new JList<>(eventModel) {
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+    };
     private final JLabel simulationState = new JLabel();
     private final JLabel generatedValue = new JLabel("0");
     private final JLabel waitingValue = new JLabel("0");
@@ -163,28 +179,32 @@ public final class QueuevantaFrame extends JFrame {
         counterList.setBackground(SURFACE);
         counterList.setSelectionBackground(SURFACE_LIGHT);
         counterList.setSelectionForeground(TEXT);
-        counterList.setFixedCellHeight(132);
+        counterList.setFixedCellHeight(122);
         counterList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         counterList.setCellRenderer(new CounterRenderer());
         counterList.setToolTipText("Each card shows service, capacity, current work, and estimated wait.");
         JScrollPane scroll = new JScrollPane(counterList);
+        scroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         styleScroll(scroll);
         panel.add(scroll, BorderLayout.CENTER);
 
-        JPanel actions = new JPanel(new GridLayout(2, 2, 8, 8));
+        JPanel actions = new JPanel(new GridLayout(1, 3, 8, 0));
         actions.setOpaque(false);
         JButton add = secondaryButton("Add Counter");
-        availability.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        add.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        add.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER), new EmptyBorder(6, 8, 6, 8)));
+        availability.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         availability.setBackground(SURFACE);
         availability.setFocusPainted(false);
         availability.setOpaque(true);
         availability.setBorder(
-            BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER), new EmptyBorder(8, 12, 8, 12)));
+                BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(BORDER), new EmptyBorder(6, 8, 6, 8)));
         availability.setToolTipText(
-            "Disabling preserves active and waiting customers; re-enable the counter to resume its queue.");
+                "Disabling preserves active and waiting customers; re-enable the counter to resume its queue.");
         availability.setForeground(TEAL);
-        removeCounter.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        removeCounter.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         removeCounter.setBackground(SURFACE);
         removeCounter.setFocusPainted(false);
         removeCounter.setOpaque(true);
@@ -192,13 +212,12 @@ public final class QueuevantaFrame extends JFrame {
         removeCounter.setBorder(
                 BorderFactory.createCompoundBorder(
                         BorderFactory.createLineBorder(new Color(242, 204, 201)),
-                        new EmptyBorder(8, 12, 8, 12)));
+                        new EmptyBorder(6, 8, 6, 8)));
         add.setToolTipText("Add a counter with a unique name and service duration from 1 to 100 ticks.");
         removeCounter.setToolTipText("Remove a counter only when it has no active or waiting customers.");
         actions.add(add);
         actions.add(availability);
         actions.add(removeCounter);
-        actions.add(new JLabel());
         panel.add(actions, BorderLayout.SOUTH);
         add.addActionListener(event -> addCounter());
         availability.addActionListener(event -> toggleSelectedCounter());
@@ -213,9 +232,14 @@ public final class QueuevantaFrame extends JFrame {
                 "Customer queues & activity",
                 "Customers stay in their assigned FIFO queue; counters serve in parallel.");
         panel.setLayout(new BorderLayout(8, 8));
-        configureTextArea(queues);
-        configureTextArea(log);
-        queues.setToolTipText("Active and waiting customers grouped by service counter.");
+        queues.setBackground(SURFACE);
+        queues.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        queues.setCellRenderer(new QueueRowRenderer());
+        queues.setToolTipText("Serving customers and FIFO waiting order for each counter.");
+        log.setBackground(SURFACE);
+        log.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        log.setCellRenderer(new EventRowRenderer());
+        log.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
         log.setToolTipText("Recent simulation events in tick order.");
         JScrollPane queuePane = new JScrollPane(queues);
         JScrollPane logPane = new JScrollPane(log);
@@ -237,12 +261,11 @@ public final class QueuevantaFrame extends JFrame {
         JPanel footer = surfacePanel();
         footer.setLayout(new BorderLayout(8, 8));
         footer.setBorder(new EmptyBorder(12, 14, 12, 14));
-        JPanel controlRows = new JPanel(new GridLayout(2, 1, 0, 6));
-        controlRows.setOpaque(false);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        JPanel options = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        actions.setOpaque(false);
-        options.setOpaque(false);
+        JPanel groups = new JPanel(new GridLayout(1, 3, 10, 0));
+        groups.setOpaque(false);
+        JPanel simulation = controlGroup("SIMULATION");
+        JPanel generation = controlGroup("CUSTOMER GENERATION");
+        JPanel configuration = controlGroup("CONFIGURATION & EXPORT");
 
         JButton generateOne = secondaryButton("Generate Customer");
         JButton generateBatch = secondaryButton("Generate Batch");
@@ -259,22 +282,25 @@ public final class QueuevantaFrame extends JFrame {
         batch.setToolTipText("Number of customers to generate in one batch (1–100).");
         waitThreshold.setToolTipText("Show a bottleneck warning at or above this estimated wait (ticks).");
 
-        JLabel thresholdLabel = label("Warn at estimated wait ≥", 14, Font.PLAIN, MUTED);
-        actions.add(start);
-        actions.add(pause);
-        actions.add(service);
-        actions.add(generateOne);
-        actions.add(batch);
-        actions.add(generateBatch);
-        options.add(thresholdLabel);
-        options.add(waitThreshold);
-        options.add(reset);
-        options.add(export);
-        controlRows.add(actions);
-        controlRows.add(options);
+        JLabel thresholdLabel = label("Warn at wait (ticks)", 13, Font.PLAIN, MUTED);
+        JPanel generationRows = new JPanel(new GridLayout(2, 1, 0, 4));
+        generationRows.setOpaque(false);
+        generationRows.add(controlRow(service, generateOne));
+        generationRows.add(
+                controlRow(label("Batch", 13, Font.PLAIN, MUTED), batch, generateBatch));
+        JPanel configurationRows = new JPanel(new GridLayout(2, 1, 0, 4));
+        configurationRows.setOpaque(false);
+        configurationRows.add(controlRow(thresholdLabel, waitThreshold));
+        configurationRows.add(controlRow(reset, export));
+        simulation.add(controlRow(start, pause), BorderLayout.CENTER);
+        generation.add(generationRows, BorderLayout.CENTER);
+        configuration.add(configurationRows, BorderLayout.CENTER);
+        groups.add(simulation);
+        groups.add(generation);
+        groups.add(configuration);
         footerStatus.setForeground(MUTED);
         footerStatus.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        footer.add(controlRows, BorderLayout.CENTER);
+        footer.add(groups, BorderLayout.CENTER);
         footer.add(footerStatus, BorderLayout.SOUTH);
 
         start.addActionListener(event -> runner.resume());
@@ -290,6 +316,15 @@ public final class QueuevantaFrame extends JFrame {
         styleInput(service);
         styleInput(batch);
         styleInput(waitThreshold);
+        service.setPreferredSize(new Dimension(116, 36));
+        batch.setPreferredSize(new Dimension(70, 36));
+        waitThreshold.setPreferredSize(new Dimension(70, 36));
+        setControlSize(start, 154);
+        setControlSize(pause, 76);
+        setControlSize(generateOne, 154);
+        setControlSize(generateBatch, 145);
+        setControlSize(reset, 145);
+        setControlSize(export, 104);
         waitThreshold.addChangeListener(event -> refreshCounters());
         return footer;
     }
@@ -331,10 +366,38 @@ public final class QueuevantaFrame extends JFrame {
         }
     }
 
+    private JPanel controlGroup(String title) {
+        JPanel group = new JPanel(new BorderLayout(4, 4));
+        group.setOpaque(false);
+        group.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder(
+                        BorderFactory.createLineBorder(BORDER),
+                        title,
+                        javax.swing.border.TitledBorder.LEADING,
+                        javax.swing.border.TitledBorder.TOP,
+                        new Font("Segoe UI", Font.BOLD, 11),
+                        MUTED),
+                new EmptyBorder(2, 4, 4, 4)));
+        return group;
+    }
+
+    private JPanel controlRow(Component... components) {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        row.setOpaque(false);
+        for (Component component : components) {
+            row.add(component);
+        }
+        return row;
+    }
+
+    private void setControlSize(JButton button, int width) {
+        button.setPreferredSize(new Dimension(width, 36));
+    }
+
     private JPanel titledPane(String title, Component content) {
         JPanel panel = new JPanel(new BorderLayout(0, 6));
         panel.setOpaque(false);
-        panel.add(label(title, 10, Font.BOLD, MUTED), BorderLayout.NORTH);
+        panel.add(label(title, 12, Font.BOLD, MUTED), BorderLayout.NORTH);
         panel.add(content, BorderLayout.CENTER);
         return panel;
     }
@@ -381,17 +444,6 @@ public final class QueuevantaFrame extends JFrame {
     private void styleScroll(JScrollPane scroll) {
         scroll.setBorder(BorderFactory.createLineBorder(BORDER));
         scroll.getViewport().setBackground(SURFACE);
-    }
-
-    private void configureTextArea(JTextArea area) {
-        area.setEditable(false);
-        area.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        area.setForeground(TEXT);
-        area.setBackground(SURFACE);
-        area.setCaretColor(TEXT);
-        area.setLineWrap(true);
-        area.setWrapStyleWord(true);
-        area.setBorder(new EmptyBorder(12, 12, 12, 12));
     }
 
     private void seed() {
@@ -595,43 +647,26 @@ public final class QueuevantaFrame extends JFrame {
     }
 
     private void renderQueues(List<CounterSnapshot> snapshots) {
-        StringBuilder text = new StringBuilder();
-        for (CounterSnapshot counter : snapshots) {
-            text.append(counter.name())
-                .append("  ·  ")
-                .append(counter.enabled() ? "Enabled" : "Disabled")
-                .append('\n');
-            text.append("  Serving: ");
-            if (counter.activeCustomer() == null) {
-                text.append("Nobody");
-            } else {
-                text.append(counter.activeCustomer())
-                        .append("  ·  ")
-                        .append(counter.remainingTicks())
-                        .append(" ticks left");
-            }
-            text.append("\n  Waiting: ");
-            text.append(
-                    counter.waitingCustomers().isEmpty()
-                            ? "Nobody"
-                            : String.join("  →  ", counter.waitingCustomers()));
-            text.append("\n\n");
+        queueModel.clear();
+        List<QueuePanelModel.Row> rows = QueuePanelModel.fromSnapshots(snapshots);
+        if (rows.isEmpty()) {
+            queueModel.addElement(QueuePanelModel.empty("No service counters configured. Add a counter to begin."));
+        } else {
+            rows.forEach(queueModel::addElement);
         }
-        queues.setText(
-            text.length() == 0
-                ? "No service counters configured.\nAdd a counter to start exploring a queue scenario."
-                : text.toString());
-        queues.setCaretPosition(0);
     }
 
     private void renderEvents(List<String> events) {
-        StringBuilder text = new StringBuilder();
-        for (String event : events) text.append(event).append('\n');
-        log.setText(
-            text.length() == 0
-                ? "No events yet. Start the simulation or generate customers to see activity."
-                : text.toString());
-        log.setCaretPosition(log.getDocument().getLength());
+        eventModel.clear();
+        if (events.isEmpty()) {
+            eventModel.addElement("No events yet. Start the simulation or generate customers to see activity.");
+        } else {
+            events.forEach(eventModel::addElement);
+        }
+        int last = eventModel.size() - 1;
+        if (last >= 0) {
+            log.ensureIndexIsVisible(last);
+        }
     }
 
     private void showError(Exception exception) {
@@ -704,6 +739,9 @@ public final class QueuevantaFrame extends JFrame {
             serviceLabel.setToolTipText(tooltip);
             workload.setToolTipText(tooltip);
             estimate.setToolTipText(tooltip);
+            workload.setToolTipText(
+                    "Serving: " + active + "; " + counter.waitingCustomers().size()
+                            + " waiting; " + counter.completed() + " completed.");
             JPanel details = new JPanel(new GridLayout(3, 1, 2, 2));
             details.setOpaque(false);
             details.add(serviceLabel);
@@ -713,5 +751,49 @@ public final class QueuevantaFrame extends JFrame {
             card.add(details, BorderLayout.CENTER);
             return card;
         }
+    }
+
+    private final class QueueRowRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(
+                JList<?> list, Object value, int index, boolean selected, boolean focused) {
+            QueuePanelModel.Row row = (QueuePanelModel.Row) value;
+            JLabel label = new JLabel(row.text());
+            label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            label.setForeground(row.kind() == QueuePanelModel.Kind.HEADER ? TEXT : MUTED);
+            label.setBorder(new EmptyBorder(
+                    row.kind() == QueuePanelModel.Kind.HEADER ? 10 : 5,
+                    row.kind() == QueuePanelModel.Kind.HEADER ? 10 : 22,
+                    row.kind() == QueuePanelModel.Kind.HEADER ? 5 : 5,
+                    10));
+            label.setOpaque(true);
+            label.setBackground(row.kind() == QueuePanelModel.Kind.HEADER ? SURFACE_LIGHT : SURFACE);
+            label.setFont(label.getFont().deriveFont(
+                    row.kind() == QueuePanelModel.Kind.HEADER ? Font.BOLD : Font.PLAIN));
+            label.setText(wrappedHtml(row.text(), Math.max(180, list.getWidth() - 55)));
+            label.setToolTipText(row.text());
+            return label;
+        }
+    }
+
+    private final class EventRowRenderer extends DefaultListCellRenderer {
+        @Override
+        public Component getListCellRendererComponent(
+                JList<?> list, Object value, int index, boolean selected, boolean focused) {
+            JLabel label = (JLabel) super.getListCellRendererComponent(
+                    list, value, index, false, false);
+            label.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            label.setForeground(TEXT);
+            label.setBackground(index % 2 == 0 ? SURFACE : BACKGROUND);
+            label.setBorder(new EmptyBorder(7, 10, 7, 10));
+            label.setText(wrappedHtml(value.toString(), Math.max(180, list.getWidth() - 30)));
+            label.setToolTipText(value.toString());
+            return label;
+        }
+    }
+
+    private String wrappedHtml(String text, int width) {
+        String escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+        return "<html><div style='width: " + width + "px'>" + escaped + "</div></html>";
     }
 }
