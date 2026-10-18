@@ -31,8 +31,9 @@ A fresh application launch seeds five demonstration counters and 14 customers. R
 
 ## Git and repository state
 
-This work is on `feature/queuevanta-rebrand-ui`, based on the latest fetched `origin/main`. At the time of this handover, `origin` still points to `https://github.com/harryfernando10/QueueCraft-Java.git`; the GitHub repository rename must be verified separately. Recheck `git status --short --branch`, `git log -1 --oneline`, and `git remote -v` before continuing.
+This work is on `feature/queuevanta-rebrand-ui`, based on the latest fetched `origin/main`. At the time of this handover, `origin` still points to `https://github.com/harryfernando10/Queuevanta.git`; the GitHub repository rename must be verified separately. Recheck `git status --short --branch`, `git log -1 --oneline`, and `git remote -v` before continuing.
 
 Before finalizing, rerun tests and `clean package`, run `git diff --check`, review the full diff and stale-name search, commit the intended files, push the branch, then verify the repository rename and remote URL. GitHub CLI is not installed; a GitHub browser session may be available, otherwise rename through repository Settings → General.
 
 See [architecture](docs/ARCHITECTURE.md), [testing](docs/TESTING.md), [development guide](docs/DEVELOPMENT.md), [roadmap](docs/ROADMAP.md), and [module mapping](docs/MODULE_MAPPING.md).
+
