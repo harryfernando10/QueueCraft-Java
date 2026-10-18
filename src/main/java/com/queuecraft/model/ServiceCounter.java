@@ -1,6 +1,8 @@
 package com.queuecraft.model;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.Objects;
+import java.util.Queue;
 
 public final class ServiceCounter {
   private final String name;

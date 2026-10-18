@@ -1,6 +1,7 @@
 package com.queuecraft.service;
 
-import com.queuecraft.model.*;
+import com.queuecraft.model.ServiceCounter;
+import com.queuecraft.model.ServiceType;
 import java.util.Collection;
 
 public final class CounterValidator {

@@ -1,7 +1,10 @@
 package com.queuecraft.concurrent;
 
 import com.queuecraft.engine.SimulationEngine;
-import java.util.concurrent.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import javax.swing.SwingUtilities;
 
 public final class SimulationRunner implements AutoCloseable {

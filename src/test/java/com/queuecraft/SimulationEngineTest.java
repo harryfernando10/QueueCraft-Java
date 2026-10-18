@@ -1,10 +1,19 @@
 package com.queuecraft;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.queuecraft.engine.SimulationEngine;
-import com.queuecraft.model.*;
-import com.queuecraft.service.*;
+import com.queuecraft.model.Customer;
+import com.queuecraft.model.CustomerStatus;
+import com.queuecraft.model.ServiceCounter;
+import com.queuecraft.model.ServiceType;
+import com.queuecraft.service.CounterValidator;
+import com.queuecraft.service.SimulationException;
+import com.queuecraft.service.SimulationStats;
 import com.queuecraft.strategy.ShortestQueueStrategy;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -98,5 +107,27 @@ class SimulationEngineTest {
         SimulationException.class,
         () -> CounterValidator.create("Desk", ServiceType.IT_HELP, 3, e.getCounters()));
     assertDoesNotThrow(() -> CounterValidator.create("North-1", ServiceType.IT_HELP, 3, List.of()));
+  }
+
+  @Test
+  void disabledCounterKeepsItsQueueAndSnapshotWaitEstimateIsDetached() throws Exception {
+    SimulationEngine engine = new SimulationEngine();
+    engine.addCounter(new ServiceCounter("Desk", ServiceType.LIBRARY, 3));
+    engine.generateBatch(ServiceType.LIBRARY, 3);
+    engine.setPaused(false);
+    engine.step();
+    engine.setCounterEnabled("Desk", false);
+
+    var snapshot = engine.getCounterSnapshots().get(0);
+    assertEquals(2, snapshot.waitingCustomers().size());
+    assertEquals(9, snapshot.estimatedWaitTicks());
+    assertEquals(3, snapshot.load());
+    assertThrows(UnsupportedOperationException.class, () -> snapshot.waitingCustomers().clear());
+
+    engine.step();
+    assertEquals(2, engine.getCounterSnapshots().get(0).waitingCustomers().size());
+    engine.setCounterEnabled("Desk", true);
+    for (int i = 0; i < 10; i++) engine.step();
+    assertEquals(3, engine.stats().completed());
   }
 }
